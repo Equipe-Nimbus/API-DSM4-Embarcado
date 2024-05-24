@@ -4,8 +4,8 @@
 
 String uidPlaca; 
 
-char *ssid = "Corvinal";
-char *pwd = "senhahp126";
+char *ssid = "<Nome-da-red>";
+char *pwd = "<Senha-da-rede>";
 
 WiFiClient wclient;
 HTTPClient http_post;
@@ -16,7 +16,7 @@ int daylight = 0;
 time_t now;
 struct tm timeinfo;
 
-String servidorRecepcao = "http://192.168.15.8:8001/medicao/guardar";
+String servidorRecepcao = "<IP-Rede+Url-Aplicacao>";
 
 TaskHandle_t tTask1;
 TaskHandle_t tTask2;
