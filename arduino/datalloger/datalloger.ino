@@ -34,8 +34,7 @@ void minhaTask1 (void *pvPrametes) {
     xSemaphoreTake(mutex, portMAX_DELAY);
 
     // Alterando variáveis globais
-    uidPlaca = WiFi.macAddress();
-    uidPlaca.replace(":", "");
+    
     temperatura = temperatura + 0.5;
 
     xSemaphoreGive(mutex);
@@ -85,7 +84,7 @@ void connectWiFi() {
 void setup() {
   Serial.begin(115200);
   uidPlaca = WiFi.macAddress();
-  uidPlaca.replace(":", " ");
+  uidPlaca.replace(":", "");
   WiFi.begin(ssid, pwd);
   connectWiFi();
   configTime(gmtOffset, daylight, nptServer);
