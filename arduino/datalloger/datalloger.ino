@@ -4,8 +4,11 @@
 
 String uidPlaca; 
 
-char *ssid = "<NOME-REDE>";
-char *pwd = "<SENHA-REDE>";
+char *ssid = "<Nome-da-red>";
+char *pwd = "<Senha-da-rede>";
+
+WiFiClient wclient;
+HTTPClient http_post;
 
 char *nptServer = "br.pool.ntp.org";
 long gmtOffset = 0;
@@ -13,23 +16,54 @@ int daylight = 0;
 time_t now;
 struct tm timeinfo;
 
-String servidorRecepcao = "<IP-REDE+ROTA-SERVIÇO-APLICAÇÃO>";
+String servidorRecepcao = "<IP-Rede+Url-Aplicacao>";
 
 TaskHandle_t tTask1;
+TaskHandle_t tTask2;
+TaskHandle_t tTask3;
 
 SemaphoreHandle_t mutex;
 
 float temperatura = 0.0;
 float umidade = 0.0;
 float bateria = 100.0;
+int contador = 1;
 
 void minhaTask1 (void *pvPrametes) {
   Serial.println("Iniciando a Task1");
   while(true) {
     xSemaphoreTake(mutex, portMAX_DELAY);
-    temperatura = temperatura + 0.5;
-    umidade = umidade + 0.5;
+
+    // Alterando variáveis globais
+    
+    temperatura = temperatura + 2;
+
+    xSemaphoreGive(mutex);
+    delay(10000);
+  } 
+}
+
+void minhaTask2 (void *pvPrametes) {
+  Serial.println("Iniciando a Task2");
+  while(true) {
+    xSemaphoreTake(mutex, portMAX_DELAY);
+
+    // Alterando variáveis globais
+    umidade = umidade + 2;
+
+    xSemaphoreGive(mutex);
+    delay(10000);
+  } 
+}
+
+void minhaTask3 (void *pvPrametes) {
+  Serial.println("Iniciando a Task3");
+  while(true) {
+    xSemaphoreTake(mutex, portMAX_DELAY);
+
+    // Alterando variáveis globais
     bateria = bateria - 0.1;
+
     xSemaphoreGive(mutex);
     delay(10000);
   } 
@@ -49,7 +83,7 @@ void connectWiFi() {
 void setup() {
   Serial.begin(115200);
   uidPlaca = WiFi.macAddress();
-  uidPlaca.replace(":", " ");
+  uidPlaca.replace(":", "");
   WiFi.begin(ssid, pwd);
   connectWiFi();
   configTime(gmtOffset, daylight, nptServer);
@@ -72,6 +106,26 @@ void setup() {
       &tTask1,
       0
     );
+
+    xTaskCreatePinnedToCore(
+      minhaTask2,
+      "MinhaTask2",
+      10000,
+      NULL,
+      1,
+      &tTask2,
+      0
+    );
+
+    xTaskCreatePinnedToCore(
+      minhaTask3,
+      "MinhaTask3",
+      10000,
+      NULL,
+      1,
+      &tTask3,
+      0
+    );
   }
 }
 
@@ -81,22 +135,22 @@ void loop() {
       Serial.println("Erro ao coletar data/hora");
     }
 
-    WiFiClient wclient;
-    HTTPClient http_post;
-
     http_post.begin(wclient, servidorRecepcao);
     http_post.addHeader("Content-Type", "application/json");
 
-    String data = "{\"uuid\":\"" + uidPlaca + "\",\"unix\":" + time(&now) + ",\"bateria\":" + bateria + ",\"temperatura\":" + temperatura + ",\"umidade\":" + umidade + "}";
+    String data = "{\"idPlacaEstacao\":\"" + uidPlaca + "\",\"unix\":" + time(&now) + ",\"bateria\":" + bateria + ",\"temperatura\":" + temperatura + ",\"umidade\":" + umidade + "}";
 
     int http_get_status = http_post.POST(data.c_str());
 
     Serial.println("");
+    Serial.println("contador: ");
+    Serial.println(contador);
     Serial.println(http_get_status);
-    if (http_get_status == 200) {
+    if (http_get_status >= 0) {
       Serial.println("");
       Serial.println(data);
       Serial.println(http_post.getString());
+      contador = contador + 1;
     } else {
       Serial.println("Erro ao executar o GET");
     }
