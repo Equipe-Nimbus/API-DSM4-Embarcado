@@ -27,6 +27,7 @@ SemaphoreHandle_t mutex;
 float temperatura = 0.0;
 float umidade = 0.0;
 float bateria = 100.0;
+int contador = 1;
 
 void minhaTask1 (void *pvPrametes) {
   Serial.println("Iniciando a Task1");
@@ -35,7 +36,7 @@ void minhaTask1 (void *pvPrametes) {
 
     // Alterando variáveis globais
     
-    temperatura = temperatura + 0.5;
+    temperatura = temperatura + 2;
 
     xSemaphoreGive(mutex);
     delay(10000);
@@ -48,10 +49,10 @@ void minhaTask2 (void *pvPrametes) {
     xSemaphoreTake(mutex, portMAX_DELAY);
 
     // Alterando variáveis globais
-    umidade = umidade + 0.5;
+    umidade = umidade + 2;
 
     xSemaphoreGive(mutex);
-    delay(15000);
+    delay(10000);
   } 
 }
 
@@ -61,8 +62,6 @@ void minhaTask3 (void *pvPrametes) {
     xSemaphoreTake(mutex, portMAX_DELAY);
 
     // Alterando variáveis globais
-    uidPlaca = WiFi.macAddress();
-    uidPlaca.replace(":", "");
     bateria = bateria - 0.1;
 
     xSemaphoreGive(mutex);
@@ -139,16 +138,19 @@ void loop() {
     http_post.begin(wclient, servidorRecepcao);
     http_post.addHeader("Content-Type", "application/json");
 
-    String data = "{\"uuid\":\"" + uidPlaca + "\",\"unix\":" + time(&now) + ",\"bateria\":" + bateria + ",\"temperatura\":" + temperatura + ",\"umidade\":" + umidade + "}";
+    String data = "{\"idPlacaEstacao\":\"" + uidPlaca + "\",\"unix\":" + time(&now) + ",\"bateria\":" + bateria + ",\"temperatura\":" + temperatura + ",\"umidade\":" + umidade + "}";
 
     int http_get_status = http_post.POST(data.c_str());
 
     Serial.println("");
+    Serial.println("contador: ");
+    Serial.println(contador);
     Serial.println(http_get_status);
-    if (http_get_status == 200) {
+    if (http_get_status >= 0) {
       Serial.println("");
       Serial.println(data);
       Serial.println(http_post.getString());
+      contador = contador + 1;
     } else {
       Serial.println("Erro ao executar o GET");
     }
