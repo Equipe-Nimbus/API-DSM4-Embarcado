@@ -1,11 +1,18 @@
 #include <WiFi.h>
 #include "time.h"
 #include <HTTPClient.h>
+#include "Grove_Temperature_And_Humidity_Sensor.h"
+
+#define DHTTYPE DHT11
+#define DHTPIN 14
+#define LUMINOSIDADEPIN 4
+
+DHT dht(DHTPIN, DHTTYPE);
 
 String uidPlaca; 
 
-char *ssid = "<Nome-da-red>";
-char *pwd = "<Senha-da-rede>";
+char *ssid = "Nome Rede";
+char *pwd = "Senha Rede";
 
 WiFiClient wclient;
 HTTPClient http_post;
@@ -27,6 +34,7 @@ SemaphoreHandle_t mutex;
 float temperatura = 0.0;
 float umidade = 0.0;
 float bateria = 100.0;
+float lux = 0.00;
 int contador = 1;
 
 void minhaTask1 (void *pvPrametes) {
@@ -34,12 +42,15 @@ void minhaTask1 (void *pvPrametes) {
   while(true) {
     xSemaphoreTake(mutex, portMAX_DELAY);
 
-    // Alterando variáveis globais
-    
-    temperatura = temperatura + 2;
+    analogReadResolution(10);
+
+    float volts = analogRead(LUMINOSIDADEPIN) * 5 / 1024.0;
+    float amps = volts / 1000.0;
+    float microamps = amps * 1000000;
+    lux = microamps * 2.0;
 
     xSemaphoreGive(mutex);
-    delay(10000);
+    delay(5000);
   } 
 }
 
@@ -48,11 +59,17 @@ void minhaTask2 (void *pvPrametes) {
   while(true) {
     xSemaphoreTake(mutex, portMAX_DELAY);
 
-    // Alterando variáveis globais
-    umidade = umidade + 2;
+    float temp_hum_val[2] = {0};
+
+    if (!dht.readTempAndHumidity(temp_hum_val)) {
+      umidade = temp_hum_val[0];
+      temperatura = temp_hum_val[1];
+    } else {
+        Serial.println("Failed to get temprature and humidity value.");
+    }
 
     xSemaphoreGive(mutex);
-    delay(10000);
+    delay(5000);
   } 
 }
 
@@ -61,11 +78,10 @@ void minhaTask3 (void *pvPrametes) {
   while(true) {
     xSemaphoreTake(mutex, portMAX_DELAY);
 
-    // Alterando variáveis globais
-    bateria = bateria - 0.1;
+    bateria = bateria - 1.0;
 
     xSemaphoreGive(mutex);
-    delay(10000);
+    delay(1000);
   } 
 }
 
@@ -87,6 +103,10 @@ void setup() {
   WiFi.begin(ssid, pwd);
   connectWiFi();
   configTime(gmtOffset, daylight, nptServer);
+  Wire.begin();
+  dht.begin();
+
+  pinMode(LUMINOSIDADEPIN, INPUT);
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Erro ao aceesar o servidor do NTP");
   } else {
@@ -114,7 +134,7 @@ void setup() {
       NULL,
       1,
       &tTask2,
-      0
+      1
     );
 
     xTaskCreatePinnedToCore(
@@ -130,21 +150,25 @@ void setup() {
 }
 
 void loop() {
+  
   if (WiFi.status() == WL_CONNECTED) {
     if (!getLocalTime(&timeinfo)) {
       Serial.println("Erro ao coletar data/hora");
     }
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreGive(mutex);
 
     http_post.begin(wclient, servidorRecepcao);
     http_post.addHeader("Content-Type", "application/json");
 
-    String data = "{\"idPlacaEstacao\":\"" + uidPlaca + "\",\"unix\":" + time(&now) + ",\"bateria\":" + bateria + ",\"temperatura\":" + temperatura + ",\"umidade\":" + umidade + "}";
+    String data = "{\"idPlacaEstacao\":\"" + uidPlaca + "\",\"unix\":" + time(&now) + ",\"bateria\":" + bateria + ",\"temperatura\":" + temperatura + ",\"umidade\":" + umidade + ",\"luminosidade\":" + lux + "}";
 
     int http_get_status = http_post.POST(data.c_str());
 
     Serial.println("");
     Serial.println("contador: ");
     Serial.println(contador);
+    Serial.println(data);
     Serial.println(http_get_status);
     if (http_get_status >= 0) {
       Serial.println("");
@@ -154,9 +178,6 @@ void loop() {
     } else {
       Serial.println("Erro ao executar o GET");
     }
-
-    xSemaphoreTake(mutex, portMAX_DELAY);
-    xSemaphoreGive(mutex);
   } else {
     Serial.println("Problema na internet");
     connectWiFi();
